@@ -76,7 +76,7 @@ class Login extends Component {
 
     // Redirect to dashboard if logged in
     if (isLoggedIn) {
-      return <Navigate to="/dashboard" replace />;
+      return <Navigate to="/preferences" replace />;
     }
 
     return (
