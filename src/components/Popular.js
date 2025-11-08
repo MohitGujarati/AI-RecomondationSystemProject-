@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 
 // Event Registry API constants
 const EVENT_REGISTRY_URL = "https://eventregistry.org/api/v1/article/getArticles";
-const EVENT_REGISTRY_API_KEY = process.env.REACT_APP_EVENT_REGISTRY_API_KEY || "652a6ed9-ae4f-4e08-85ba-edbf0e3583d3";
+const EVENT_REGISTRY_API_KEY = process.env.REACT_APP_EVENT_REGISTRY_API_KEY || "ADD_YOUR_API_KEY_HERE";
 const NEWS_IMAGE_PLACEHOLDER = "https://via.placeholder.com/150";
 const CATEGORY_PLACEHOLDER_IMAGE = "https://via.placeholder.com/300x150/4a90e2/ffffff?text=";
 const internalAPI="http://localhost:5000/api/recommendations";
