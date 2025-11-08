@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 
 // Event Registry API constants
 const EVENT_REGISTRY_URL = "https://eventregistry.org/api/v1/article/getArticles";
-const EVENT_REGISTRY_API_KEY = process.env.REACT_APP_EVENT_REGISTRY_API_KEY || "Add_Your_API_Key_Here";
+const EVENT_REGISTRY_API_KEY = process.env.REACT_APP_EVENT_REGISTRY_API_KEY || "652a6ed9-ae4f-4e08-85ba-edbf0e3583d3";
 const NEWS_IMAGE_PLACEHOLDER = "https://via.placeholder.com/150";
 const CATEGORY_PLACEHOLDER_IMAGE = "https://via.placeholder.com/300x150/4a90e2/ffffff?text=";
 const internalAPI="http://localhost:5000/api/recommendations";
@@ -27,60 +27,55 @@ class Popular extends Component {
    // this.updateRecommendationNews();
   }
 
-  async fetchPopularNews() {
-    // Event Registry payload
+async fetchPopularNews() {
+  const payload = {
+    action: "getArticles",
+    keyword: "",
+    sourceLocationUri: [
+      "http://en.wikipedia.org/wiki/United_States",
+      "http://en.wikipedia.org/wiki/Canada",
+      "http://en.wikipedia.org/wiki/United_Kingdom"
+    ],
+    ignoreSourceGroupUri: "paywall/paywalled_sources",
+    articlesPage: 1,
+    articlesCount: 20,
+    articlesIncludeConcepts: true,
+    includeArticleCategories: true, // ✅ make sure categories are returned
+    articlesSortBy: "date",
+    articlesSortByAsc: false,
+    dataType: ["news", "pr"],
+    forceMaxDataTimeWindow: 31,
+    resultType: "articles",
+    lang: ["eng"],
+    apiKey: EVENT_REGISTRY_API_KEY
+  };
 
-    const payload = {
-      action: "getArticles",
-      keyword: "",
-      sourceLocationUri: [
-        "http://en.wikipedia.org/wiki/United_States",
-        "http://en.wikipedia.org/wiki/Canada",
-        "http://en.wikipedia.org/wiki/United_Kingdom"
-      ],
-  
-      ignoreSourceGroupUri: "paywall/paywalled_sources",
-      articlesPage: 1,
-      articlesCount: 20,
-      articlesIncludeConcepts: true,
-      articlesIncludeCategories: true, // <-- this tells API to include categories
-      articlesSortBy: "date",
-      articlesSortByAsc: false,
-      dataType: ["news", "pr"],
-      forceMaxDataTimeWindow: 31,
-      resultType: "articles",
-      lang: ["eng"],
-      apiKey: EVENT_REGISTRY_API_KEY
-    };
+  try {
+    this.setState({ isLoading: true, error: null });
 
-    try {
-      this.setState({ isLoading: true, error: null });
+    const response = await fetch(EVENT_REGISTRY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-      const response = await fetch(EVENT_REGISTRY_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+    if (!response.ok) throw new Error(`Error: ${response.status}`);
 
-      if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
-      }
+    const data = await response.json();
 
-      const data = await response.json();
-      const articles = data?.articles?.results || [];
+    // ✅ Extract category titles for each article
+    const articles = data?.articles?.results?.map(a => ({
+      ...a,
+      categories: a.categories?.map(c => c.label) || []
+    })) || [];
 
-      this.setState({
-        popularNews: articles,
-        isLoading: false,
-      });
-    } catch (error) {
-      console.error("Could not fetch Event Registry news:", error);
-      this.setState({
-        error: error.message,
-        isLoading: false,
-      });
-    }
+    this.setState({ popularNews: articles, isLoading: false });
+  } catch (error) {
+    console.error("Could not fetch Event Registry news:", error);
+    this.setState({ error: error.message, isLoading: false });
   }
+}
+
 
   formatDate(dateString) {
     try {
@@ -154,9 +149,17 @@ class Popular extends Component {
               
             </span>
           </div>
-
           <h3 style={styles.newsTitle}>{article.title}</h3>
 
+          <p style={styles.newsDescription}>{article.body}</p>
+
+{/* ✅ Show categories if they exist */}
+{article.categories && article.categories.length > 0 && (
+  <p style={{ fontStyle: "italic", color: "#666", marginTop: "5px" }}>
+    Categories: {article.categories[0]}
+  </p>
+)}
+       
           <p style={styles.newsDescription}>{article.body}</p>
 
           <div style={styles.newsFooter}>

@@ -52,7 +52,7 @@ def run_recommender():
     """Run the recommendation system"""
     print("🚀 Running news recommendation system...")
     try:
-        from src.components.news_recommender import main
+        from components.news_recommender import main
         main()
         return True
     except Exception as e:

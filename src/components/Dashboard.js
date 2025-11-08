@@ -67,7 +67,7 @@ function Dashboard() {
       {/* Header (unchanged) */}
       <header style={styles.header}>
         <div style={styles.headerInner}>
-          <h1 style={styles.logo}>Cognito News</h1>
+          <h1 style={styles.mastheadTitle}>The Cognito Times</h1>
           <div style={styles.headerRight}>
            <button className="button" onClick={handleEditPreferences} style={styles.headerButton}>
                 <HiPencil style={{ marginRight: '6px' }} /> {/* Icon */}
@@ -186,6 +186,13 @@ headerButton: {
     maxWidth: '1200px',
     margin: '0 auto',
     marginBottom: '80px', // Adjusted space for the new floating bar
+  },
+    mastheadTitle: {
+    fontFamily: '"Playfair Display", serif',
+    fontSize: "40px",
+    fontWeight: "700",
+    color: "#000",
+    margin: "5px 0",
   },
 
   // --- MODIFIED: tabButton Style ---
