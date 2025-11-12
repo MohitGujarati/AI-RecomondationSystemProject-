@@ -1,6 +1,13 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
-from news_recommender import NewsRecommender
+
+# Try to import NewsRecommender; if missing gensim or anything else, fall back
+try:
+    from news_recommender import NewsRecommender  # needs gensim
+    _HAVE_RECOMMENDER = True
+except Exception as _e:
+    print(f"[WARN] NewsRecommender unavailable ({_e}); serving SAMPLE_RECOMMENDATIONS only")
+    _HAVE_RECOMMENDER = False
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key_123"  # simple fixed key
@@ -34,19 +41,28 @@ SAMPLE_RECOMMENDATIONS = [
 @app.route("/api/recommendations", methods=["GET"])
 def get_recommendations():
     try:
-        recommender = NewsRecommender()
-        articles = recommender.recommend_articles(pages=3, num_recommendations=25)
-        formatted = recommender.format_recommendations(articles)
-
-        if not formatted:
-            print("[WARN] No articles fetched, returning sample recommendations")
+        if _HAVE_RECOMMENDER:
+            recommender = NewsRecommender()
+            articles = recommender.recommend_articles(pages=3, num_recommendations=25)
+            formatted = recommender.format_recommendations(articles)
+            if not formatted:
+                print("[WARN] No articles fetched, returning sample recommendations")
+                return jsonify(SAMPLE_RECOMMENDATIONS)
+            return jsonify(formatted)
+        else:
+            print("[INFO] Using SAMPLE_RECOMMENDATIONS (no recommender)")
             return jsonify(SAMPLE_RECOMMENDATIONS)
-
-        return jsonify(formatted)
-
     except Exception as e:
         print(f"[ERROR] Exception in recommendations: {e}")
         return jsonify(SAMPLE_RECOMMENDATIONS)
+
+@app.route("/api/log-like", methods=["POST"])
+def log_like():
+    data = request.get_json(silent=True) or {}
+    title = data.get("title", "Unknown")
+    category = data.get("category", "General")
+    print(f'LIKE clicked — Article: "{title}" | Category: {category}', flush=True)
+    return jsonify({"ok": True})
 
 if __name__ == "__main__":
     print("Starting Flask server on http://localhost:5000")

@@ -83,7 +83,7 @@ class Login extends Component {
       <div style={styles.container}>
         <div style={styles.loginBox}>
           
-          <h2 style={styles.title}>NewsRec AI</h2>
+          <h2 style={styles.title}>The Cognito News </h2>
           
           <form onSubmit={this.handleSubmit} style={styles.form}>
             

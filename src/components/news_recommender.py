@@ -18,7 +18,7 @@ load_dotenv()
 
 class NewsRecommender:
     def __init__(self):
-        self.api_key = os.getenv("EVENT_REGISTRY_API_KEY", "Add_Your_API_Key_Here")
+        self.api_key = os.getenv("EVENT_REGISTRY_API_KEY", "ADD_YOUR_API_KEY_HERE")
         if not self.api_key:
             raise ValueError("Missing Event Registry API key")
 
