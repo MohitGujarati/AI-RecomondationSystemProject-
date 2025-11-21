@@ -27,7 +27,6 @@ const Btn_like = ({ id }) => {
 };
 
 
-
 /* === Original Popular class component (structure preserved) === */
 class Popular extends Component {
   constructor(props) {
@@ -42,6 +41,8 @@ class Popular extends Component {
 
   componentDidMount() {
     this.fetchPopularNews();
+    // OPTIONAL: Add listener here to log read history if you want to track history automatically
+    // window.addEventListener('scroll', this.logReadHistory); 
   }
 
   async fetchPopularNews() {
@@ -92,7 +93,6 @@ class Popular extends Component {
     catch { return "Unknown date"; }
   }
 
-  // Primary category from labels/objects or fallback to a concept
   getPrimaryCategory(article) {
     const cats = article?.categories;
     if (!cats || cats.length === 0) {
@@ -104,20 +104,39 @@ class Popular extends Component {
     return top?.label?.eng || top?.label || "General";
   }
 
-  // Like button click -> send to backend to print on server terminal
+  // --- UPDATED: Send full article data and User ID ---
   handleLikeClick(article, index, e) {
-    // Stop only the card navigation; DO NOT prevent default so checkbox can toggle red
     e.stopPropagation();
-    const category = this.getPrimaryCategory(article);
+
+    const userData = JSON.parse(localStorage.getItem('user'));
+    const userId = userData?.uid;
+
+    if (!userId) {
+        console.warn("Cannot log like: User not authenticated.");
+        return;
+    }
+    
+    // Prepare the structured data to be saved in Firestore
+    const dataToSend = {
+        userId: userId,
+        articleId: article.uri, // Use the unique article URI as ID
+        title: article.title,
+        url: article.url,
+        summary: article.body.substring(0, 500), // Save a partial body for the profile
+        category: this.getPrimaryCategory(article),
+        source: article.source.title,
+        timestamp: new Date().toISOString()
+    };
 
     fetch("http://127.0.0.1:5000/api/log-like", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: article.title, category })
+      body: JSON.stringify(dataToSend)
     }).catch((err) => {
       console.error("log-like failed:", err);
     });
   }
+  // --- END UPDATED handleLikeClick ---
 
   // Render a single article card
   renderArticleCard(article, index) {
@@ -137,6 +156,9 @@ class Popular extends Component {
         style={cardStyle}
         onMouseEnter={() => this.setState({ hoveredIndex: index })}
         onMouseLeave={() => this.setState({ hoveredIndex: null })}
+        // --- ADD HISTORY LOGGING HERE (Passive tracking on click) ---
+        onClick={() => this.logReadHistory(article)} 
+        // --- END HISTORY LOGGING ---
       >
         {/* Image banner area */}
         <div style={styles.imageContainer}>
@@ -187,6 +209,33 @@ class Popular extends Component {
       </a>
     );
   }
+
+    // --- NEW: Passive Logging of Read History (on card click) ---
+    logReadHistory(article) {
+        const userData = JSON.parse(localStorage.getItem('user'));
+        const userId = userData?.uid;
+
+        if (!userId) return;
+
+        const historyData = {
+            userId: userId,
+            articleId: article.uri, 
+            title: article.title,
+            summary: article.body.substring(0, 500),
+            timestamp: new Date().toISOString()
+        };
+
+        // Send to a separate endpoint optimized for history logging
+        fetch("http://127.0.0.1:5000/api/log-history", { 
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(historyData)
+        }).catch((err) => {
+            console.error("log-history failed:", err);
+        });
+    }
+    // --- END NEW logReadHistory ---
+
 
   render() {
     const { popularNews, isLoading, error } = this.state;

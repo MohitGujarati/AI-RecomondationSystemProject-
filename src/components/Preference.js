@@ -1,6 +1,8 @@
 import React, { Component } from 'react';
 import { Navigate } from 'react-router-dom';
-import { getPreferences, savePreferences, clearPreferences } from './preferencesService';
+import { doc, getDoc, setDoc } from "firebase/firestore";
+
+// --- NOTE: This component MUST receive 'firestore' as a prop ---
 
 class Preferences extends Component {
   constructor(props) {
@@ -10,22 +12,50 @@ class Preferences extends Component {
       selected: [],
       message: '',
       isLoggedIn: true,
-      redirectToDashboard: false
+      redirectToDashboard: false,
+      userId: null,
+      isLoading: true
     };
   }
 
   componentDidMount() {
-    // Check if user is logged in
+    this.checkAuthAndLoadPreferences();
+  }
+
+  checkAuthAndLoadPreferences = async () => {
     const userData = localStorage.getItem('user');
+
     if (!userData) {
-      this.setState({ isLoggedIn: false });
+      this.setState({ isLoggedIn: false, isLoading: false });
       return;
     }
 
-    // Load saved preferences from localStorage
-    const savedPrefs = getPreferences();
-    if (savedPrefs && savedPrefs.length > 0) {
-      this.setState({ selected: savedPrefs });
+    const { uid } = JSON.parse(userData);
+    this.setState({ userId: uid });
+
+    try {
+      // Check if Firestore prop is available before proceeding
+      if (!this.props.firestore) {
+        console.error("Firestore instance not passed to Preferences component.");
+        this.setState({ message: '❌ Database connection error.', isLoading: false });
+        return;
+      }
+      
+      // GET preferences from Firestore
+      const userRef = doc(this.props.firestore, 'userPreferences', uid);
+      const docSnap = await getDoc(userRef);
+
+      if (docSnap.exists()) {
+        const savedPrefs = docSnap.data().categories || [];
+        this.setState({ selected: savedPrefs, isLoading: false });
+        console.log("Loaded preferences from Firestore:", savedPrefs);
+      } else {
+        console.log("No preferences found for user.");
+        this.setState({ isLoading: false });
+      }
+    } catch (error) {
+      console.error("Error fetching preferences:", error);
+      this.setState({ message: '❌ Error loading preferences.', isLoading: false });
     }
   }
 
@@ -38,41 +68,65 @@ class Preferences extends Component {
     this.setState({ selected: updated, message: '' });
   };
 
-  handleSave = () => {
-    const { selected } = this.state;
-    const success = savePreferences(selected);
-    if (success) {
+  handleSave = async () => {
+    const { selected, userId } = this.state;
+
+    if (!userId || !this.props.firestore) {
+        this.setState({ message: '❌ User or database connection missing.', isLoggedIn: false });
+        return;
+    }
+
+    try {
+      // SAVE preferences to Firestore
+      const userRef = doc(this.props.firestore, 'userPreferences', userId);
+
+      await setDoc(userRef, {
+        categories: selected,
+        lastUpdated: new Date().toISOString()
+      }, { merge: true });
+
       this.setState({ message: '✅ Preferences saved successfully!' });
 
-      // Navigate to dashboard after a short delay (for user feedback)
       setTimeout(() => {
         this.setState({ redirectToDashboard: true });
       }, 1000);
-    } else {
-      this.setState({ message: '❌ Failed to save preferences. Please try again.' });
+
+    } catch (error) {
+      console.error("Error saving preferences:", error);
+      this.setState({ message: '❌ Failed to save preferences to database. Please try again.' });
     }
   };
 
   handleLogout = () => {
+    // Note: In a real app, you would call signOut(this.props.auth) here.
+    if (this.props.auth) {
+      this.props.auth.signOut().catch((error) => {
+        console.error("Error signing out:", error);
+      });
+    }
     localStorage.removeItem('user');
-    clearPreferences();
     this.setState({ isLoggedIn: false });
   };
 
   render() {
-    const { categories, selected, message, isLoggedIn, redirectToDashboard } = this.state;
+    const { categories, selected, message, isLoggedIn, redirectToDashboard, isLoading } = this.state;
 
-    // Redirect to login if logged out
     if (!isLoggedIn) {
       return <Navigate to="/" replace />;
     }
 
-    // Redirect to dashboard after saving
     if (redirectToDashboard) {
       return <Navigate to="/Dashboard" replace />;
     }
 
+    if (isLoading) {
+        return <div style={styles.container}><h2 style={styles.title}>Loading Preferences...</h2></div>;
+    }
+
     return (
+      //TODO:
+      //if user has already save the preferences previously move to dashboard
+
       <div style={styles.container}>
         <div style={styles.card}>
           <h2 style={styles.title}>Select Your Preferences</h2>
@@ -98,10 +152,10 @@ class Preferences extends Component {
 
           <div style={styles.buttonContainer}>
             <button onClick={this.handleSave} style={styles.saveButton}>
-              💾 Save / Update Preferences
+            Save / Update Preferences
             </button>
             <button onClick={this.handleLogout} style={styles.logoutButton}>
-              🚪 Logout
+            Logout
             </button>
           </div>
         </div>
@@ -112,79 +166,15 @@ class Preferences extends Component {
 
 // --- Styling ---
 const styles = {
-  container: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: '100vh',
-    backgroundColor: '#f9fafb',
-    padding: '20px'
-  },
-  card: {
-    backgroundColor: 'white',
-    padding: '40px',
-    borderRadius: '12px',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-    maxWidth: '600px',
-    width: '100%',
-  },
-  title: {
-    fontSize: '26px',
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: '10px',
-    textAlign: 'center'
-  },
-  subtitle: {
-    color: '#6b7280',
-    fontSize: '14px',
-    textAlign: 'center',
-    marginBottom: '20px'
-  },
-  categoryContainer: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '10px',
-    justifyContent: 'center'
-  },
-  categoryButton: {
-    padding: '10px 16px',
-    borderRadius: '8px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: '500',
-    fontSize: '14px'
-  },
-  message: {
-    textAlign: 'center',
-    marginTop: '20px',
-    fontSize: '14px',
-    color: '#10b981'
-  },
-  buttonContainer: {
-    display: 'flex',
-    justifyContent: 'center',
-    gap: '20px',
-    marginTop: '30px'
-  },
-  saveButton: {
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    padding: '10px 20px',
-    borderRadius: '8px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: '600',
-  },
-  logoutButton: {
-    backgroundColor: '#ef4444',
-    color: 'white',
-    padding: '10px 20px',
-    borderRadius: '8px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: '600'
-  }
+    container: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#f9fafb', padding: '20px' },
+    card: { backgroundColor: 'white', padding: '40px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)', maxWidth: '600px', width: '100%' },
+    title: { fontSize: '26px', fontWeight: '700', color: '#1f2937', marginBottom: '10px', textAlign: 'center' },
+    subtitle: { color: '#6b7280', fontSize: '14px', textAlign: 'center', marginBottom: '20px' },
+    categoryContainer: { display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center' },
+    categoryButton: { padding: '10px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '14px' },
+    message: { textAlign: 'center', marginTop: '20px', fontSize: '14px', color: '#10b981' },
+    buttonContainer: { display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '30px' },
+    saveButton: { backgroundColor: '#3b82f6', color: 'white', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600' },
 };
 
 export default Preferences;
