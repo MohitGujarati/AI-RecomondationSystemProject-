@@ -56,7 +56,7 @@ except Exception as e:
 
 class NewsRecommender:
     def __init__(self, user_id: str = None):
-        self.api_key = os.getenv("EVENT_REGISTRY_API_KEY", "ADD_YOUR_API_KEY_HERE")
+        self.api_key = os.getenv("EVENT_REGISTRY_API_KEY", "ADD_YOUR_API")
         if not self.api_key:
             raise ValueError("Missing Event Registry API key")
 
@@ -396,17 +396,17 @@ class NewsRecommender:
                 "recommendation_score": round(art.get("recommendation_score", 0), 2),
             })
 
-        print("="*80)
-        print(" "*25 + " TOP RECOMMENDATIONS")
-        print("="*80)
-        for i, article in enumerate(recommendations[:10], 1):
-            score = article['recommendation_score']
-            print(f"\n🏆 RANK {i}: {article['title'][:65]}...")
-            print(f"    Score: {score:.4f} | Category: {article['category']} | Source: {article.get('source', {}).get('title', 'Unknown')}")
+        # print("="*80)
+        # print(" "*25 + " TOP RECOMMENDATIONS")
+        # print("="*80)
+        # for i, article in enumerate(recommendations[:10], 1):
+        #     score = article['recommendation_score']
+        #     print(f"\n🏆 RANK {i}: {article['title'][:65]}...")
+        #     print(f"    Score: {score:.4f} | Category: {article['category']} | Source: {article.get('source', {}).get('title', 'Unknown')}")
         
-        print("\n" + "="*80)
-        print(f" Total recommendations: {len(recommendations)}")
-        print("="*80 + "\n")
+        # print("\n" + "="*80)
+        # print(f" Total recommendations: {len(recommendations)}")
+        # print("="*80 + "\n")
 
         self.save_json(formatted, filename=filename)
         return formatted

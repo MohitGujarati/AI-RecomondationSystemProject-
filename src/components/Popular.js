@@ -3,7 +3,7 @@ import styled from 'styled-components';
 
 // Event Registry API constants
 const EVENT_REGISTRY_URL = "https://eventregistry.org/api/v1/article/getArticles";
-const EVENT_REGISTRY_API_KEY = process.env.REACT_APP_EVENT_REGISTRY_API_KEY || "ADD_YOUR_API_KEY_HERE";
+const EVENT_REGISTRY_API_KEY = process.env.REACT_APP_EVENT_REGISTRY_API_KEY || "ADD_YOUR_API";
 
 /* === Like Button component — visuals unchanged so heart turns red === */
 const Btn_like = ({ id }) => {
@@ -112,20 +112,20 @@ class Popular extends Component {
     const userId = userData?.uid;
 
     if (!userId) {
-        console.warn("Cannot log like: User not authenticated.");
-        return;
+      console.warn("Cannot log like: User not authenticated.");
+      return;
     }
-    
+
     // Prepare the structured data to be saved in Firestore
     const dataToSend = {
-        userId: userId,
-        articleId: article.uri, // Use the unique article URI as ID
-        title: article.title,
-        url: article.url,
-        summary: article.body.substring(0, 500), // Save a partial body for the profile
-        category: this.getPrimaryCategory(article),
-        source: article.source.title,
-        timestamp: new Date().toISOString()
+      userId: userId,
+      articleId: article.uri, // Use the unique article URI as ID
+      title: article.title,
+      url: article.url,
+      summary: article.body.substring(0, 500), // Save a partial body for the profile
+      category: this.getPrimaryCategory(article),
+      source: article.source.title,
+      timestamp: new Date().toISOString()
     };
 
     fetch("http://127.0.0.1:5000/api/log-like", {
@@ -157,8 +157,8 @@ class Popular extends Component {
         onMouseEnter={() => this.setState({ hoveredIndex: index })}
         onMouseLeave={() => this.setState({ hoveredIndex: null })}
         // --- ADD HISTORY LOGGING HERE (Passive tracking on click) ---
-        onClick={() => this.logReadHistory(article)} 
-        // --- END HISTORY LOGGING ---
+        onClick={() => this.logReadHistory(article)}
+      // --- END HISTORY LOGGING ---
       >
         {/* Image banner area */}
         <div style={styles.imageContainer}>
@@ -189,52 +189,52 @@ class Popular extends Component {
             </span>
           </div>
 
-        <h3 style={styles.newsTitle}>{article.title}</h3>
+          <h3 style={styles.newsTitle}>{article.title}</h3>
 
-        <p style={styles.newsDescription}>{article.body}</p>
+          <p style={styles.newsDescription}>{article.body}</p>
 
-        {article.categories && article.categories.length > 0 && (
-          <p style={{ fontStyle: "italic", color: "#666", marginTop: "5px" }}>
-            Categories: {this.getPrimaryCategory(article)}
-          </p>
-        )}
+          {article.categories && article.categories.length > 0 && (
+            <p style={{ fontStyle: "italic", color: "#666", marginTop: "5px" }}>
+              Categories: {this.getPrimaryCategory(article)}
+            </p>
+          )}
 
-        <p style={styles.newsDescription}>{article.body}</p>
+          <p style={styles.newsDescription}>{article.body}</p>
 
-        <div style={styles.newsFooter}>
-          <span>{article.authors?.[0]?.name || "Unknown"}</span>
-          <span>{this.formatDate(article.dateTime)}</span>
-        </div>
+          <div style={styles.newsFooter}>
+            <span>{article.authors?.[0]?.name || "Unknown"}</span>
+            <span>{this.formatDate(article.dateTime)}</span>
+          </div>
         </div>
       </a>
     );
   }
 
-    // --- NEW: Passive Logging of Read History (on card click) ---
-    logReadHistory(article) {
-        const userData = JSON.parse(localStorage.getItem('user'));
-        const userId = userData?.uid;
+  // --- NEW: Passive Logging of Read History (on card click) ---
+  logReadHistory(article) {
+    const userData = JSON.parse(localStorage.getItem('user'));
+    const userId = userData?.uid;
 
-        if (!userId) return;
+    if (!userId) return;
 
-        const historyData = {
-            userId: userId,
-            articleId: article.uri, 
-            title: article.title,
-            summary: article.body.substring(0, 500),
-            timestamp: new Date().toISOString()
-        };
+    const historyData = {
+      userId: userId,
+      articleId: article.uri,
+      title: article.title,
+      summary: article.body.substring(0, 500),
+      timestamp: new Date().toISOString()
+    };
 
-        // Send to a separate endpoint optimized for history logging
-        fetch("http://127.0.0.1:5000/api/log-history", { 
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(historyData)
-        }).catch((err) => {
-            console.error("log-history failed:", err);
-        });
-    }
-    // --- END NEW logReadHistory ---
+    // Send to a separate endpoint optimized for history logging
+    fetch("http://127.0.0.1:5000/api/log-history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(historyData)
+    }).catch((err) => {
+      console.error("log-history failed:", err);
+    });
+  }
+  // --- END NEW logReadHistory ---
 
 
   render() {

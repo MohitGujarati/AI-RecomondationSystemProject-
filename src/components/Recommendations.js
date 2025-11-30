@@ -11,11 +11,11 @@ function Recommendations({ reload }) {
     setLoading(true);
     setError(null);
     try {
-       const res = await fetch("recommendations.json");
+      const res = await fetch("recommendations.json");
       //const res = await fetch("http://localhost:5000/api/recommendations");
       if (!res.ok) throw new Error("Failed to fetch recommendations");
       const data = await res.json();
-     
+
       setRecommendations(data);
     } catch (err) {
       console.error(err);
@@ -28,15 +28,15 @@ function Recommendations({ reload }) {
     }
   };
 
-    const TotalRefresh = async () => {
+  const TotalRefresh = async () => {
     setLoading(true);
     setError(null);
     try {
-       //const res = await fetch("recommendations.json");
+      //const res = await fetch("recommendations.json");
       const res = await fetch("http://localhost:5000/api/recommendations");
       if (!res.ok) throw new Error("Failed to fetch recommendations");
       const data = await res.json();
-     
+
       setRecommendations(data);
     } catch (err) {
       console.error(err);
@@ -75,17 +75,17 @@ function Recommendations({ reload }) {
   if (loading) {
     return (
       <StyledWrapper>
-      <div class="dot-spinner">
-    <div class="dot-spinner__dot"></div>
-    <div class="dot-spinner__dot"></div>
-    <div class="dot-spinner__dot"></div>
-    <div class="dot-spinner__dot"></div>
-    <div class="dot-spinner__dot"></div>
-    <div class="dot-spinner__dot"></div>
-    <div class="dot-spinner__dot"></div>
-    <div class="dot-spinner__dot"></div>
-</div>
-    </StyledWrapper>
+        <div class="dot-spinner">
+          <div class="dot-spinner__dot"></div>
+          <div class="dot-spinner__dot"></div>
+          <div class="dot-spinner__dot"></div>
+          <div class="dot-spinner__dot"></div>
+          <div class="dot-spinner__dot"></div>
+          <div class="dot-spinner__dot"></div>
+          <div class="dot-spinner__dot"></div>
+          <div class="dot-spinner__dot"></div>
+        </div>
+      </StyledWrapper>
     );
   }
 
@@ -94,7 +94,7 @@ function Recommendations({ reload }) {
       <div style={styles.container}>
         <div style={styles.errorBox}>
           ⚠️ {error}
-          <button 
+          <button
             onClick={fetchRecommendations}
             style={{ marginLeft: "10px", padding: "5px 10px", cursor: "pointer" }}
           >
@@ -114,14 +114,14 @@ function Recommendations({ reload }) {
   }
 
   return (
-  <div style={styles.container}>
+    <div style={styles.container}>
       <div style={styles.header}>
         <div>
           <h2 style={styles.headerTitle}>Recommended News</h2>
           <p style={styles.headerSubtitle}>Curated stories based on your interests</p>
         </div>
         <button
-          className="button" 
+          className="button"
           onClick={TotalRefresh}
           onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
           onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
@@ -172,18 +172,18 @@ function Recommendations({ reload }) {
 
             <div style={styles.contentSection}>
               <div style={styles.contentSection}>
-                  <div style={styles.metaRow}>
-                    {article.recommendation_score && (
-                      <div style={styles.metaBadgeContainer}>
-                        <span style={styles.scoreBadge}>
-                          ⭐ {(article.recommendation_score * 100).toFixed(0)}%
-                        </span>
-                        <span style={styles.categoryBadge}>
-                          {article.category || "General"}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                <div style={styles.metaRow}>
+                  {article.recommendation_score && (
+                    <div style={styles.metaBadgeContainer}>
+                      <span style={styles.scoreBadge}>
+                        ⭐ {(article.recommendation_score * 100).toFixed(0)}%
+                      </span>
+                      <span style={styles.categoryBadge}>
+                        {article.category || "General"}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <h3 style={styles.newsTitle}>{article.title}</h3>
@@ -217,7 +217,7 @@ const styles = {
     borderRadius: "5px",
     marginBottom: "15px",
   },
-   refreshButton: {
+  refreshButton: {
     position: 'absolute',
     top: '50%',
     right: '10px',
@@ -228,7 +228,7 @@ const styles = {
     color: '#555',
   },
   newsList: {
-  padding: "20px",
+    padding: "20px",
     justifyContent: "center",
     alignItems: "center",
     borderRadius: "8px",
@@ -239,7 +239,7 @@ const styles = {
     margin: "20px 0",
   },
   newsItem: {
-     width: "300px",
+    width: "300px",
     height: "400px", // <-- Set a fixed height that accommodates your content (adjust as needed)
     backgroundColor: 'rgba(243, 241, 241, 0.45)',
     boxShadow: '0 1px 10px rgba(0,0,0,0.10)',
@@ -287,15 +287,15 @@ const styles = {
     margin: "10px 0",
     lineHeight: 1.3,
   },
-newsDescription: {
+  newsDescription: {
     fontSize: "14px",
     color: "#333",
     lineHeight: 1.4,
     flexGrow: 1,
     overflow: "hidden",
     display: "-webkit-box",
-    WebkitLineClamp: 3, 
-    WebkitBoxOrient: "vertical", 
+    WebkitLineClamp: 3,
+    WebkitBoxOrient: "vertical",
   },
   newsFooter: {
     display: "flex",
@@ -316,9 +316,9 @@ newsDescription: {
     fontSize: "0.8rem",
 
   },
- 
-    metaRow: {
-    
+
+  metaRow: {
+
     backgroundColor: "#f9fafb",
     borderRadius: "12px",
     padding: "6px 12px",
