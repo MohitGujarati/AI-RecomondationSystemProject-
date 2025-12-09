@@ -3,7 +3,7 @@ import styled from 'styled-components';
 
 // Event Registry API constants
 const EVENT_REGISTRY_URL = "https://eventregistry.org/api/v1/article/getArticles";
-const EVENT_REGISTRY_API_KEY = process.env.REACT_APP_EVENT_REGISTRY_API_KEY || "ADD_YOUR_API";
+const EVENT_REGISTRY_API_KEY = process.env.REACT_APP_EVENT_REGISTRY_API_KEY || "ADD_API_KEY";
 
 /* === Like Button component — visuals unchanged so heart turns red === */
 const Btn_like = ({ id }) => {

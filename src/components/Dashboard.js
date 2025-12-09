@@ -17,7 +17,7 @@ const tabIcons = {
 
 
 // CRITICAL FIX: Dashboard must accept auth and firestore as arguments (props)
-function Dashboard({ auth, firestore }) { 
+function Dashboard({ auth, firestore }) {
     const [user, setUser] = useState(null);
     const [isLoggedOut, setIsLoggedOut] = useState(false);
     const [activeTab, setActiveTab] = useState('popular');
@@ -121,7 +121,7 @@ const styles = {
         flexDirection: 'column',
     },
 
-    
+
     header: {
         backgroundColor: 'rgba(243, 241, 241, 0.45)',
         boxShadow: '0 1px 10px rgba(0,0,0,0.10)',
@@ -136,11 +136,11 @@ const styles = {
         borderRadius: '10px',
         border: '1px solid rgba(255,255,255,0.25)',
     },
-headerButton: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-},
+    headerButton: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     headerInner: {
         width: '100%',
         maxWidth: '1200px',
@@ -163,7 +163,7 @@ headerButton: {
         fontWeight: 800,
         margin: 0,
     },
-    
+
     // --- MODIFIED: Tab Bar Style ---
     tabBar: {
         display: 'flex',
@@ -211,7 +211,7 @@ headerButton: {
         justifyContent: 'center',
         transition: 'opacity 0.2s ease-in-out',
     },
-    
+
     // --- NEW: activeDot Style ---
     activeDot: {
         position: 'absolute',

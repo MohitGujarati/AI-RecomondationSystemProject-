@@ -1,6 +1,9 @@
-scikit-learn==1.3.0
-pandas==2.0.3
-numpy==1.24.3
-requests==2.31.0
-python-dotenv==1.0.0
-
+scikit-learn
+pandas
+numpy
+requests
+python-dotenv
+flask
+flask-cors
+firebase-admin
+sentence-transformers

@@ -72,18 +72,30 @@ function Recommendations({ reload }) {
     }
   };
 
+  // Helper to group articles by category
+  const groupByCategory = (articles) => {
+    return articles.reduce((acc, article) => {
+      const category = article.category || "General";
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(article);
+      return acc;
+    }, {});
+  };
+
   if (loading) {
     return (
       <StyledWrapper>
-        <div class="dot-spinner">
-          <div class="dot-spinner__dot"></div>
-          <div class="dot-spinner__dot"></div>
-          <div class="dot-spinner__dot"></div>
-          <div class="dot-spinner__dot"></div>
-          <div class="dot-spinner__dot"></div>
-          <div class="dot-spinner__dot"></div>
-          <div class="dot-spinner__dot"></div>
-          <div class="dot-spinner__dot"></div>
+        <div className="dot-spinner">
+          <div className="dot-spinner__dot"></div>
+          <div className="dot-spinner__dot"></div>
+          <div className="dot-spinner__dot"></div>
+          <div className="dot-spinner__dot"></div>
+          <div className="dot-spinner__dot"></div>
+          <div className="dot-spinner__dot"></div>
+          <div className="dot-spinner__dot"></div>
+          <div className="dot-spinner__dot"></div>
         </div>
       </StyledWrapper>
     );
@@ -113,6 +125,8 @@ function Recommendations({ reload }) {
     );
   }
 
+  const categorizedArticles = groupByCategory(recommendations);
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -129,74 +143,73 @@ function Recommendations({ reload }) {
           <HiRefresh size={20} />
           <span style={{ marginLeft: '8px' }}>Refresh</span>
         </button>
-
       </div>
 
-      <div style={styles.newsList}>
-        {recommendations.map((article) => (
-          <a
-            key={article.id}
-            href={article.url || "#"}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={styles.newsItem}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-8px)';
-              e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.15)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
-            }}
-          >
-            <div style={styles.imageContainer}>
-              <img
-                src={
-                  article.urlToImage ||
-                  `https://via.placeholder.com/300x200/667eea/ffffff?text=${encodeURIComponent(
-                    article.category
-                  )}`
-                }
-                alt={article.title}
-                style={styles.newsImage}
-                onError={(e) => {
-                  e.target.src = `https://via.placeholder.com/300x200/667eea/ffffff?text=${encodeURIComponent(
-                    article.category
-                  )}`;
+      {Object.keys(categorizedArticles).map((category) => (
+        <div key={category} style={styles.categorySection}>
+          <h3 style={styles.categoryTitle}>{category}</h3>
+          <div style={styles.newsList}>
+            {categorizedArticles[category].map((article) => (
+              <a
+                key={article.id}
+                href={article.url || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={styles.newsItem}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-8px)';
+                  e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.15)';
                 }}
-              />
-              <div style={styles.imageOverlay}>
-                <span style={styles.categoryBadge}>{article.category}</span>
-              </div>
-            </div>
-
-            <div style={styles.contentSection}>
-              <div style={styles.contentSection}>
-                <div style={styles.metaRow}>
-                  {article.recommendation_score && (
-                    <div style={styles.metaBadgeContainer}>
-                      <span style={styles.scoreBadge}>
-                        ⭐ {(article.recommendation_score * 100).toFixed(0)}%
-                      </span>
-                      <span style={styles.categoryBadge}>
-                        {article.category || "General"}
-                      </span>
-                    </div>
-                  )}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+                }}
+              >
+                <div style={styles.imageContainer}>
+                  <img
+                    src={
+                      article.urlToImage ||
+                      `https://via.placeholder.com/300x200/667eea/ffffff?text=${encodeURIComponent(
+                        article.category
+                      )}`
+                    }
+                    alt={article.title}
+                    style={styles.newsImage}
+                    onError={(e) => {
+                      e.target.src = `https://via.placeholder.com/300x200/667eea/ffffff?text=${encodeURIComponent(
+                        article.category
+                      )}`;
+                    }}
+                  />
+                  <div style={styles.imageOverlay}>
+                    <span style={styles.categoryBadge}>{article.category}</span>
+                  </div>
                 </div>
-              </div>
 
-              <h3 style={styles.newsTitle}>{article.title}</h3>
-              <p style={styles.newsDescription}>{article.description}</p>
+                <div style={styles.contentSection}>
+                  <div style={styles.metaRow}>
+                    {article.recommendation_score && (
+                      <div style={styles.metaBadgeContainer}>
+                        <span style={styles.scoreBadge}>
+                          ⭐ {(article.recommendation_score * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-              <div style={styles.newsFooter}>
-                <span style={styles.source}>{article.source || article.author || "Unknown"}</span>
-                <span style={styles.date}>{formatDate(article.publishedAt)}</span>
-              </div>
-            </div>
-          </a>
-        ))}
-      </div>
+                  <h3 style={styles.newsTitle}>{article.title}</h3>
+                  <p style={styles.newsDescription}>{article.description}</p>
+
+                  <div style={styles.newsFooter}>
+                    <span style={styles.source}>{article.source || article.author || "Unknown"}</span>
+                    <span style={styles.date}>{formatDate(article.publishedAt)}</span>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -205,9 +218,35 @@ const styles = {
   container: {
     padding: "20px",
     maxWidth: "100%",
-    alignItems: "center",
-    justifyContent: "center",
     fontFamily: "Arial, sans-serif",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "30px",
+    paddingBottom: "10px",
+    borderBottom: "1px solid #eee",
+  },
+  headerTitle: {
+    fontSize: "2rem",
+    color: "#1a202c",
+    margin: 0,
+  },
+  headerSubtitle: {
+    fontSize: "1rem",
+    color: "#718096",
+    margin: "5px 0 0 0",
+  },
+  categorySection: {
+    marginBottom: "40px",
+  },
+  categoryTitle: {
+    fontSize: "1.5rem",
+    color: "#2d3748",
+    marginBottom: "20px",
+    borderLeft: "4px solid #3182ce",
+    paddingLeft: "10px",
   },
   errorBox: {
     width: "100%",
@@ -217,112 +256,113 @@ const styles = {
     borderRadius: "5px",
     marginBottom: "15px",
   },
-  refreshButton: {
-    position: 'absolute',
-    top: '50%',
-    right: '10px',
-    transform: 'translateY(-50%)',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: '#555',
-  },
   newsList: {
-    padding: "20px",
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: "8px",
-    alignItems: "center",
     display: "flex",
     flexWrap: "wrap",
     gap: "20px",
-    margin: "20px 0",
+    justifyContent: "flex-start", // Changed from center to align items nicely
   },
   newsItem: {
     width: "300px",
-    height: "400px", // <-- Set a fixed height that accommodates your content (adjust as needed)
-    backgroundColor: 'rgba(243, 241, 241, 0.45)',
-    boxShadow: '0 1px 10px rgba(0,0,0,0.10)',
-    backdropFilter: 'blur(12px) saturate(180%)',
-    borderRadius: '10px',
-    border: '1px solid rgba(255,255,255,0.25)',
-    borderRadius: "8px",
+    height: "420px", // Slightly increased height
     backgroundColor: "white",
+    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+    borderRadius: '12px',
     padding: "15px",
     textDecoration: "none",
     color: "black",
     display: "flex",
     flexDirection: "column",
     transition: "transform 0.2s ease, box-shadow 0.2s ease",
+    border: '1px solid rgba(0,0,0,0.05)',
   },
   imageContainer: {
     width: "100%",
-    height: "150px",
+    height: "160px",
     marginBottom: "15px",
     overflow: "hidden",
-    borderRadius: "5px",
+    borderRadius: "8px",
+    position: "relative",
   },
   newsImage: {
     width: "100%",
     height: "100%",
     objectFit: "cover",
   },
-  topRow: {
+  imageOverlay: {
+    position: "absolute",
+    bottom: "8px",
+    left: "8px",
+  },
+  contentSection: {
+    flex: 1,
     display: "flex",
-    justifyContent: "space-between",
-    marginBottom: "10px",
+    flexDirection: "column",
+  },
+  metaRow: {
+    marginBottom: "8px",
+    display: "flex",
+    alignItems: "center",
+  },
+  metaBadgeContainer: {
+    display: "flex",
+    gap: "8px",
   },
   scoreBadge: {
     backgroundColor: "#28a745",
     color: "white",
-    padding: "2px 6px",
-    borderRadius: "10px",
-    fontSize: "10px",
+    padding: "2px 8px",
+    borderRadius: "12px",
+    fontSize: "11px",
     fontWeight: "bold",
+  },
+  categoryBadge: {
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    color: "#1e293b",
+    fontWeight: 600,
+    padding: "4px 10px",
+    borderRadius: "12px",
+    fontSize: "10px",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
   },
   newsTitle: {
     fontFamily: 'Georgia, "Times New Roman", serif',
-    fontSize: "16px",
+    fontSize: "18px",
     fontWeight: "bold",
-    margin: "10px 0",
-    lineHeight: 1.3,
+    margin: "0 0 10px 0",
+    lineHeight: 1.4,
+    color: "#1a202c",
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical",
+    overflow: "hidden",
   },
   newsDescription: {
     fontSize: "14px",
-    color: "#333",
-    lineHeight: 1.4,
+    color: "#4a5568",
+    lineHeight: 1.5,
     flexGrow: 1,
     overflow: "hidden",
     display: "-webkit-box",
     WebkitLineClamp: 3,
     WebkitBoxOrient: "vertical",
+    marginBottom: "15px",
   },
   newsFooter: {
     display: "flex",
     justifyContent: "space-between",
-    borderTop: "1px solid #eee",
-    paddingTop: "10px",
+    borderTop: "1px solid #edf2f7",
+    paddingTop: "12px",
     marginTop: "auto",
     fontSize: "12px",
-    color: "#888",
+    color: "#718096",
   },
-  categoryBadge: {
-    backgroundColor: "#e2e8f0",
-    color: "#1e293b",
-    fontWeight: 500,
-    marginLeft: "8px",
-    padding: "2px 8px",
-    borderRadius: "8px",
-    fontSize: "0.8rem",
-
+  source: {
+    fontWeight: 600,
+    color: "#2d3748",
   },
-
-  metaRow: {
-
-    backgroundColor: "#f9fafb",
-    borderRadius: "12px",
-    padding: "6px 12px",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+  date: {
+    fontStyle: "italic",
   },
 };
 
@@ -440,9 +480,5 @@ const StyledWrapper = ({ children }) => (
     {children}
   </>
 );
-
-
-
-
 
 export default Recommendations;

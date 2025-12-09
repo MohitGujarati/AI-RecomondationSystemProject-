@@ -2,49 +2,47 @@ import json
 import os
 import requests
 import numpy as np
-from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
 import time
 import sys
-import firebase_admin
-from firebase_admin import credentials, firestore
+from datetime import datetime, timedelta
 from typing import List, Dict
 
+# Machine Learning Imports
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+from dotenv import load_dotenv
+
+# Firebase Imports
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+# Configure standard output for UTF-8 (prevents emoji/text crashes)
 sys.stdout.reconfigure(encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
-
 
 # Load environment variables
 load_dotenv()
 
-
 FIREBASE_PROJECT_ID = "the-cognito-times"
-# Define the path to your service account key file
 SERVICE_ACCOUNT_KEY_FILE = "src/components/serviceAccountKey.json"
-
-# Set a limit for how many historical documents to use for the profile
 MAX_HISTORY_ITEMS = 15 
 
-# --- Authentication Logic  ---
+# --- Authentication Logic ---
 try:
     if os.path.exists(SERVICE_ACCOUNT_KEY_FILE):
         cred = credentials.Certificate(SERVICE_ACCOUNT_KEY_FILE)
-        firebase_admin.initialize_app(cred, {
-            'projectId': FIREBASE_PROJECT_ID,
-        })
+        firebase_admin.initialize_app(cred, {'projectId': FIREBASE_PROJECT_ID})
         print(f"Firebase Admin SDK initialized using Service Account Key.")
     else:
         cred = credentials.ApplicationDefault()
-        firebase_admin.initialize_app(cred, {
-            'projectId': FIREBASE_PROJECT_ID,
-        })
+        firebase_admin.initialize_app(cred, {'projectId': FIREBASE_PROJECT_ID})
         print(f"Firebase Admin SDK initialized using ADC.")
-
+    
     db = firestore.client()
 
 except Exception as e:
-    print(f"Warning: Firebase Admin SDK failed to initialize. Ensure your key file is present or ADC is configured. Error: {e}")
+    print(f"Warning: Firebase Admin SDK failed to initialize. Error: {e}")
+    # Fallback to verify if app is already initialized
     try:
         if not firebase_admin._apps:
             firebase_admin.initialize_app()
@@ -56,82 +54,54 @@ except Exception as e:
 
 class NewsRecommender:
     def __init__(self, user_id: str = None):
-        self.api_key = os.getenv("EVENT_REGISTRY_API_KEY", "ADD_YOUR_API")
+        self.api_key = os.getenv("EVENT_REGISTRY_API_KEY", "ADD_API_KEY")
         if not self.api_key:
             raise ValueError("Missing Event Registry API key")
 
         # Initialize SBERT model
+        # Using all-MiniLM-L6-v2 as it balances speed and performance efficiently
         print(" Loading SBERT model (all-MiniLM-L6-v2)...")
         self.sbert_model = SentenceTransformer('all-MiniLM-L6-v2') 
         print(" SBERT model loaded successfully!\n")
         
-        # 1. Load all user data (categories, likes, and history)
+        # 1. Load User Data into STRUCTURED format (Lists, not Strings)
+        # This prevents the "token truncation" bug where old history cut off new history
+        self.user_id = user_id
         if user_id:
-            (self.raw_categories, 
-             self.liked_text, 
-             self.history_text) = self._load_user_interests_and_behavior(user_id)
+            self.user_data = self._load_user_data(user_id)
         else:
-            self.raw_categories = self._get_default_interests()
-            self.liked_text = ""
-            self.history_text = ""
+            self.user_data = {"categories": ["General"], "likes": [], "history": []}
             print("Using default interests (no user ID provided).")
         
-        # 2. Generate the rich profile for SBERT scoring using ALL available data
-        self.user_profile_text = self._generate_rich_user_profile(
-            self.raw_categories, 
-            self.liked_text,
-            self.history_text
-        )
+        # 2. Generate Weighted User Vector (The "Centroid" of their interest)
+        self.user_embedding = self._generate_user_embedding()
 
-        
+        # Cache category embeddings for fast detection later
+        self.category_profiles = self._get_category_profiles()
+        self.category_embeddings = self.sbert_model.encode(list(self.category_profiles.values()))
+
     def _get_category_profiles(self) -> Dict[str, str]:
         """Returns the detailed mapping of category names to descriptions."""
         return {
-            "Technology": (
-                "Artificial intelligence, machine learning, robotics, computer science, "
-                "gadgets, software, internet, cybersecurity, and tech industry innovations."
-            ),
-            "Business": (
-                "Markets, finance, startups, economic policies, investments, "
-                "corporate strategies, entrepreneurship, and business news."
-            ),
-            "Science": (
-                "Space exploration, research breakthroughs, biology, chemistry, "
-                "physics, astronomy, and scientific discoveries."
-            ),
-            "Health": (
-                "Medical research, healthcare innovations, fitness, nutrition, "
-                "disease prevention, mental wellness, and public health."
-            ),
-            "Politics": (
-                "Government, elections, international relations, policies, "
-                "law, diplomacy, and political events."
-            ),
-            "Sports": (
-                "Football, cricket, tennis, tournaments, player performances, "
-                "scores, championships, leagues, and athletic events."
-            ),
-            "Entertainment": (
-                "Movies, TV shows, celebrities, music, theater, pop culture, "
-                "streaming platforms, and entertainment industry."
-            ),
-            "Environment": (
-                "Climate change, sustainability, renewable energy, wildlife conservation, "
-                "environmental protection, and ecological issues."
-            ),
+            "Technology": "Artificial intelligence, machine learning, robotics, computer science, gadgets, software, internet, cybersecurity, and tech industry innovations.",
+            "Business": "Markets, finance, startups, economic policies, investments, corporate strategies, entrepreneurship, and business news.",
+            "Science": "Space exploration, research breakthroughs, biology, chemistry, physics, astronomy, and scientific discoveries.",
+            "Health": "Medical research, healthcare innovations, fitness, nutrition, disease prevention, mental wellness, and public health.",
+            "Politics": "Government, elections, international relations, policies, law, diplomacy, and political events.",
+            "Sports": "Football, basketball, cricket, tennis, hockey, tournaments, athletes, scores, championships, leagues, youth sports, and competitive games.",
+            "Entertainment": "Movies, TV shows, celebrities, music, theater, pop culture, streaming platforms, and entertainment industry.",
+            "Environment": "Climate change, sustainability, renewable energy, wildlife conservation, environmental protection, and ecological issues.",
+    
         }
     
-    def _fetch_subcollection_data(self, user_id: str, collection_name: str, doc_key: str) -> str:
-        """Helper to fetch article titles/summaries from a user subcollection."""
+    def _fetch_subcollection_list(self, user_id: str, collection_name: str, doc_key: str) -> List[Dict]:
+        """Fetches list of dicts {'text': '...', 'timestamp': ...} to maintain separate items."""
         global db
-        combined_text = []
-
-        if db is None: return ""
+        items = []
+        if db is None: return items
 
         try:
-            # Query the user's subcollection (e.g., user_liked/{user_id}/likes)
             ref = db.collection(collection_name).document(user_id).collection(doc_key)
-            
             # Fetch the most recent items
             query = ref.order_by('timestamp', direction=firestore.Query.DESCENDING).limit(MAX_HISTORY_ITEMS)
             docs = query.stream()
@@ -140,81 +110,104 @@ class NewsRecommender:
                 data = doc.to_dict()
                 title = data.get('title', '')
                 summary = data.get('summary', '') 
-                # Weight liked/viewed items by including both title and summary
-                combined_text.append(f"{title}. {summary}")
+                # Combine title + summary for better context
+                text = f"{title}. {summary}"
+                # Get timestamp or default to now
+                ts = data.get('timestamp', datetime.now())
+                items.append({'text': text, 'timestamp': ts})
 
-            print(f"Fetched {len(combined_text)} items from {collection_name}.")
-            return " ".join(combined_text)
+            print(f"Fetched {len(items)} items from {collection_name}.")
+            return items
 
         except Exception as e:
             print(f"Warning: Failed to fetch data from {collection_name} for user {user_id}: {e}")
-            return ""
+            return []
 
+    def _load_user_data(self, user_id: str):
+        """Loads categories, likes, and history into structured lists."""
+        data = {
+            "categories": ["Technology", "Science", "General"], # Default
+            "likes": [],
+            "history": []
+        }
+        
+        global db
+        if db is None: return data
 
-    def _generate_rich_user_profile(self, selected_categories: List[str], liked_text: str, history_text: str) -> str:
-        """Combines detailed category descriptions and all behavioral text into one rich profile string."""
-        profiles = self._get_category_profiles()
-        
-        # 1. Get descriptive text from selected categories (e.g., Technology description)
-        descriptive_text = " ".join(
-            profiles.get(cat, "") for cat in selected_categories
-        )
-        
-        # 2. Combine descriptive text with behavioral data. LIKES are the strongest signal.
-        # Ensure all components are present to avoid crash.
-        
-        # NOTE: We repeat the liked text once to give it slightly more weight than history.
-        rich_profile = f"{descriptive_text.strip()} {liked_text.strip()} {liked_text.strip()} {history_text.strip()}"
-        
-        if not rich_profile.strip():
-            # Safety fallback if all data sources are empty
-            return "artificial intelligence, machine learning, technology trends, general news."
-            
-        print(f"Generated Hybrid Profile using categories, likes, and history.")
-        return rich_profile
-            
-    def _get_default_interests(self) -> List[str]:
-            """Hardcoded default interests for fallback (Category Names)."""
-            return ["Technology", "Science", "General"]
-
-    def _load_user_interests_and_behavior(self, user_id: str) -> (List[str], str, str):
-        """
-        Fetches categories, liked article text, and history article text from Firestore.
-        Returns: (List[category_names], liked_text, history_text)
-        """
-        global db 
-        categories = self._get_default_interests()
-        liked_text = ""
-        history_text = ""
-        
         try:
-            if db is None:
-                print("Database client is not available. Using defaults for interests.")
-                return categories, liked_text, history_text
-
-            # --- Fetch 1. Categories (userPreferences) ---
+            # 1. Categories
             user_ref = db.collection('userPreferences').document(user_id)
-            doc_snapshot = user_ref.get()
-
-            if doc_snapshot.exists:
-                data = doc_snapshot.to_dict()
-                loaded_cats = data.get('categories', [])
-                if loaded_cats and isinstance(loaded_cats, list) and len(loaded_cats) > 0:
+            doc = user_ref.get()
+            if doc.exists:
+                loaded_cats = doc.to_dict().get('categories', [])
+                if loaded_cats and isinstance(loaded_cats, list):
                     print(f"Successfully loaded categories: {loaded_cats}")
-                    categories = loaded_cats
+                    data["categories"] = loaded_cats
             
-            # --- Fetch 2. Liked Articles (user_liked/likes) ---
-            liked_text = self._fetch_subcollection_data(user_id, 'user_liked', 'likes')
-
-            # --- Fetch 3. Watch History (user_history/reads) ---
-            history_text = self._fetch_subcollection_data(user_id, 'user_history', 'reads')
-
+            # 2. Likes & History (Keep as lists, don't join yet)
+            data["likes"] = self._fetch_subcollection_list(user_id, 'user_liked', 'likes')
+            data["history"] = self._fetch_subcollection_list(user_id, 'user_history', 'reads')
+            
         except Exception as e:
             print(f"CRITICAL ERROR in loading user data: {e}. Falling back to default data.")
-
-        return categories, liked_text, history_text
-
         
+        return data
+
+    def _generate_user_embedding(self):
+        """
+        Generates a weighted average vector.
+        Weights: Categories (20%), Likes (60%), History (20% with time decay).
+        This fixes the issue where broad categories drowned out specific user likes.
+        """
+        profiles = self._get_category_profiles()
+        
+        # A. Encode Categories
+        cat_texts = [profiles.get(cat, "") for cat in self.user_data["categories"]]
+        if not cat_texts: cat_texts = ["General news and current events"]
+        cat_embeddings = self.sbert_model.encode(cat_texts)
+        # Average category embeddings
+        avg_cat_emb = np.mean(cat_embeddings, axis=0)
+
+        # B. Encode Likes (High Importance)
+        if self.user_data["likes"]:
+            texts = [item['text'] for item in self.user_data["likes"]]
+            like_embeddings = self.sbert_model.encode(texts)
+            avg_like_emb = np.mean(like_embeddings, axis=0)
+        else:
+            avg_like_emb = np.zeros_like(avg_cat_emb)
+
+        # C. Encode History (With Time Decay)
+        if self.user_data["history"]:
+            texts = [item['text'] for item in self.user_data["history"]]
+            hist_embs = self.sbert_model.encode(texts)
+            
+            # Apply Decay: 1.0 for now, decreasing for older items
+            weighted_hist_embs = []
+            total_weight = 0
+            
+            for i, item in enumerate(self.user_data["history"]):
+                # Simple decay based on index (assuming sorted by recent)
+                # 0th item (newest) gets weight 1.0, 10th item gets weight 0.5
+                weight = 1.0 / (1.0 + (0.1 * i)) 
+                weighted_hist_embs.append(hist_embs[i] * weight)
+                total_weight += weight
+            
+            avg_hist_emb = np.sum(weighted_hist_embs, axis=0) / total_weight
+        else:
+            avg_hist_emb = np.zeros_like(avg_cat_emb)
+
+        # D. Weighted Fusion
+        # If we have likes/history, they should overpower generic categories
+        has_behavior = len(self.user_data["likes"]) > 0 or len(self.user_data["history"]) > 0
+        
+        if has_behavior:
+            # 20% Category, 60% Likes, 20% History
+            final_emb = (0.2 * avg_cat_emb) + (0.6 * avg_like_emb) + (0.2 * avg_hist_emb)
+        else:
+            final_emb = avg_cat_emb
+
+        print(" Generated Weighted User Embedding.")
+        return final_emb
 
     # 1️⃣ Fetch articles
     def fetch_news_articles(self, page=1, count=100):
@@ -254,89 +247,75 @@ class NewsRecommender:
         body = article.get("body", "")
         return f"{title} {body}".strip()
 
-    # 3️⃣ SBERT Scoring Method
-    def calculate_sbert_score(self, all_texts):
-        """
-        Calculate semantic similarity using SBERT embeddings.
-        Returns normalized scores between 0 and 1.
-        """
-        # --- USE THE RICH PROFILE TEXT ---
-        user_profile = self.user_profile_text
+    # 3️⃣ Fast Category Detection
+    def detect_category_fast(self, article_emb):
+        """Detects category using pre-computed embeddings (Faster than re-encoding)."""
+        cats = list(self.category_profiles.keys())
         
-        # Encode all texts + user profile
-        print(f" Encoding {len(all_texts)} articles with SBERT...")
-        start_time = time.time()
-        
-        embeddings = self.sbert_model.encode(
-            all_texts + [user_profile], 
-            show_progress_bar=True,
-            batch_size=32
-        )
-        
-        elapsed = time.time() - start_time
-        print(f" Encoding completed in {elapsed:.2f}s\n")
-        
-        # Calculate cosine similarity
-        article_embeddings = embeddings[:-1]
-        profile_embedding = embeddings[-1:]
-        
-        scores = cosine_similarity(profile_embedding, article_embeddings).flatten()
-        
-        # Normalize to 0-1 range
-        min_score = np.min(scores)
-        max_score = np.max(scores)
-        if max_score - min_score > 1e-9:
-            normalized_scores = (scores - min_score) / (max_score - min_score)
-        else:
-            normalized_scores = np.ones_like(scores)
-        
-        return normalized_scores
-
-    # 4️⃣ Detect category using SBERT
-    def detect_category(self, text):
-        """
-        Determine the best-fit category for an article using SBERT semantic similarity.
-        """
-        # Get the category profiles directly from the helper method
-        category_profiles = self._get_category_profiles()
-
-        categories = list(category_profiles.keys())
-        category_descriptions = list(category_profiles.values())
-        
-        # Encode category descriptions and article text
-        embeddings = self.sbert_model.encode(
-            category_descriptions + [text],
-            show_progress_bar=False
-        )
-        
-        category_embeddings = embeddings[:-1]
-        article_embedding = embeddings[-1:]
-        
-        # Calculate similarities
-        similarities = cosine_similarity(article_embedding, category_embeddings).flatten()
-        
-        best_index = np.argmax(similarities)
+        # Calculate similarity between article and all categories
+        sims = cosine_similarity([article_emb], self.category_embeddings).flatten()
+        best_idx = np.argmax(sims)
         
         # Threshold for "General" category
-        if similarities[best_index] < 0.15:
+        if sims[best_idx] < 0.15:
             return "General"
         
-        return categories[best_index]
+        return cats[best_idx]
+
+    # 4️⃣ Maximal Marginal Relevance (Diversity)
+    def maximal_marginal_relevance(self, article_embeddings, user_embedding, diversity=0.3, top_n=25):
+        """
+        Applies MMR to diversify results.
+        diversity: 0.0 (Pure Similarity) -> 1.0 (Pure Diversity)
+        """
+        # Calculate similarity to User (Relevance)
+        user_sims = cosine_similarity([user_embedding], article_embeddings).flatten()
+        
+        selected_indices = []
+        candidate_indices = list(range(len(article_embeddings)))
+        
+        # Iteratively select the best item that combines relevance and novelty
+        for _ in range(min(top_n, len(article_embeddings))):
+            best_mmr = -np.inf
+            best_idx = -1
+            
+            for idx in candidate_indices:
+                # Relevance score
+                relevance = user_sims[idx]
+                
+                # Redundancy score (Similarity to already selected items)
+                redundancy = 0
+                if selected_indices:
+                    candidate_vec = article_embeddings[idx].reshape(1, -1)
+                    selected_vecs = article_embeddings[selected_indices]
+                    # How similar is this candidate to the most similar item already picked?
+                    sim_to_selected = cosine_similarity(candidate_vec, selected_vecs)
+                    redundancy = np.max(sim_to_selected)
+                
+                # MMR Equation: Score = Relevance - (Penalty * Redundancy)
+                mmr = (1 - diversity) * relevance - (diversity * redundancy)
+                
+                if mmr > best_mmr:
+                    best_mmr = mmr
+                    best_idx = idx
+            
+            if best_idx != -1:
+                selected_indices.append(best_idx)
+                candidate_indices.remove(best_idx)
+                
+        return selected_indices
 
     # 5️⃣ Recommend top news
     def recommend_articles(self, pages=2, num_recommendations=25):
         print("="*80)
-        print(" "*20 + " SBERT NEWS RECOMMENDATION SYSTEM")
+        print(" "*20 + " SBERT + MMR NEWS RECOMMENDATION SYSTEM")
         print("="*80)
         
-        # Report the profile used for calculation
-        print(f"[INFO] Profile being used (first 100 chars): {self.user_profile_text[:100]}...")
-
         print(f"\n Fetching articles from {pages} pages...")
         
         all_articles = []
         for page in range(1, pages + 1):
-            print(f"   Fetching page {page}/{pages}...", end=" ")
+            print(f"   Fetching page {page}/{pages}...", end=" ")
             articles = self.fetch_news_articles(page=page)
             all_articles.extend(articles)
             print(f" ({len(articles)} articles)")
@@ -360,23 +339,37 @@ class NewsRecommender:
         # Preprocess all articles
         all_texts = [self.preprocess_article(a) for a in unique_articles]
         
-        # Calculate SBERT scores
-        scores = self.calculate_sbert_score(all_texts)
+        # Encode Articles (SBERT)
+        print(f" Encoding {len(unique_articles)} articles...")
+        start_time = time.time()
+        article_embeddings = self.sbert_model.encode(all_texts, batch_size=32, show_progress_bar=True)
+        print(f" Encoding completed in {time.time() - start_time:.2f}s\n")
 
-        # Assign scores and detect categories
-        print("  Detecting categories...")
-        for i, (article, score) in enumerate(zip(unique_articles, scores), 1):
-            article["recommendation_score"] = float(score)
-            article["category"] = self.detect_category(self.preprocess_article(article))
-            if i % 20 == 0:
-                print(f"   Processed {i}/{len(unique_articles)} articles...")
-        
+        # Detect categories using optimized method
+        print("  Detecting categories...")
+        for i, article in enumerate(unique_articles):
+            article["category"] = self.detect_category_fast(article_embeddings[i])
         print(f" All categories detected!\n")
 
-        # Sort by score
-        unique_articles.sort(key=lambda x: x["recommendation_score"], reverse=True)
+        # Apply MMR Ranking (Relevance + Diversity)
+        print(" Calculating MMR Ranking (Relevance + Diversity)...")
+        # Diversity=0.3 means we sacrifice a little relevance to ensure we don't show 20 duplicates
+        selected_indices = self.maximal_marginal_relevance(
+            article_embeddings, 
+            self.user_embedding, 
+            diversity=0.3, 
+            top_n=num_recommendations
+        )
         
-        return unique_articles[:num_recommendations]
+        final_recommendations = [unique_articles[i] for i in selected_indices]
+        
+        # Add visual scores for the frontend
+        for i, idx in enumerate(selected_indices):
+            # We calculate pure similarity just for the display label (0.0 - 1.0)
+            score = cosine_similarity([self.user_embedding], [article_embeddings[idx]])[0][0]
+            final_recommendations[i]["recommendation_score"] = float(score)
+        
+        return final_recommendations
 
     # 6️⃣ Format recommendations
     def format_recommendations(self, recommendations, filename="public/recommendations.json"):
@@ -395,18 +388,6 @@ class NewsRecommender:
                 "category": art.get("category", "General"),
                 "recommendation_score": round(art.get("recommendation_score", 0), 2),
             })
-
-        # print("="*80)
-        # print(" "*25 + " TOP RECOMMENDATIONS")
-        # print("="*80)
-        # for i, article in enumerate(recommendations[:10], 1):
-        #     score = article['recommendation_score']
-        #     print(f"\n🏆 RANK {i}: {article['title'][:65]}...")
-        #     print(f"    Score: {score:.4f} | Category: {article['category']} | Source: {article.get('source', {}).get('title', 'Unknown')}")
-        
-        # print("\n" + "="*80)
-        # print(f" Total recommendations: {len(recommendations)}")
-        # print("="*80 + "\n")
 
         self.save_json(formatted, filename=filename)
         return formatted
@@ -438,6 +419,10 @@ def main():
         import traceback
         traceback.print_exc()
 
-
 if __name__ == "__main__":
     main()
+
+
+
+
+  
